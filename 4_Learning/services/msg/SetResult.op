@@ -1,0 +1,6 @@
+{
+  float cost;
+  bool success;
+} request;
+bool result;
+string error;

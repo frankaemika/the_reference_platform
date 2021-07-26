@@ -1,0 +1,16 @@
+{
+  {
+    float translational_stiffness;
+    float rotational_stiffness;
+    float desired_force;
+    float wiggle_frequency_x;
+    float wiggle_frequency_y;
+    float wiggle_amplitude_x;
+    float wiggle_amplitude_y;
+  } plug_in_params;
+  float duration;
+  []float target_position;
+  []float tolerance;
+} request;
+{} result;
+string error;

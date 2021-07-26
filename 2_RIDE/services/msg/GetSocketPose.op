@@ -1,0 +1,5 @@
+{} request;
+{
+  [16]float socket_pose;
+} result;
+string error;

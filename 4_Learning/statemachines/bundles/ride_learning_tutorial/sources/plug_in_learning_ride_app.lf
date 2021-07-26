@@ -1,0 +1,363 @@
+plug_in_learning_ride_app {
+  port Success child("learning").port("success") and parameter.learning == true or
+               child("plug_in").port("success") and parameter.learning == false
+  port Error child("learning").port("error") or
+             child("get_best_params").port("error") or
+             child("plug_in").port("error")
+
+  clientData{
+    type : "app";
+    name : "Plug In Learning";
+    color : "hsl(230, 55%, 82%)";
+    description: @{
+      This app either learns the parameters of the plug_in statemachine or runs the statemachine
+      with already learned parameters. It accepts 3 poses: socket, hole and
+      home pose and all required hyperparameters for learning.
+    }@;
+    requiredParameters: [
+      { source: safety; localParameter: safety; }
+    ];
+    image: @{
+      <svg><use xlink:href="bundles/ride_learning_tutorial/logo.svg#icon"></use></svg>
+    }@;
+    contextMenu: @{
+      <step id="plug-in-poses" name="Plug-in motion" style="display: grid">
+        <style>
+          .network-cable {
+            width: 80px;
+            height: 70px;
+          }
+          .network-box {
+            width: 80px;
+            height: 80px;
+          }
+        </style>
+        <div style="display: grid; grid-column-gap: 170px; grid-row-gap: 20px;">
+         <step id="transit" name="Position above" label="Move to a safe transit position"
+            style="grid-column: 1; grid-row: 1; margin-left: auto;">
+            <robot-pose params="
+              step: step,
+              path: path,
+              pose: parameter('home_pose'),
+              isRelativeToFirst: true,
+              relatedPoses: {
+                socketPose: parameter('socket_pose'),
+                holePose: parameter('hole_pose'),
+                transit: parameter('home_pose'),
+              },
+              componentProviderAPI: componentProviderAPI
+            ">
+              <div id="transit-content">
+                <svg style="width: 100px; height: 100px; margin-left: 20px;"><use xlink:href="bundles/base/icons/gripper_opened.svg#icon"></use></svg>
+              </div>
+            </robot-pose>
+          </step>
+          <step id="socket" name="Contact with input"
+            label="Establish contact with the top part of the input"
+            style="grid-column: 1; grid-row: 2;">
+            <robot-pose params="
+              step: step,
+              path: path,
+              pose: parameter('socket_pose'),
+              relatedPoses: {
+                socketPose: parameter('socket_pose'),
+                holePose: parameter('hole_pose'),
+                transit: parameter('home_pose'),
+              },
+              componentProviderAPI: componentProviderAPI
+            ">
+              <div id="socket-content" top="60px" left="90px" class="relative" style="width: 80px; height: 130px;">
+                <svg class="center-bottom network-box static-light-gray visible"><use xlink:href="bundles/base/icons/cube.svg#icon"></use></svg>
+                <svg class="center-top network-cable">
+                  <use xlink:href="bundles/ride_learning_tutorial/plug.svg#icon"></use>
+                </svg>
+              </div>
+            </robot-pose>
+          </step>
+          <step id="hole" name="Plug insert" label="Insert the plug so that it reaches its desired position"
+            style="grid-column: 1; grid-row: 3; justify-content: center; align-items: flex-start;">
+            <robot-pose params="
+              step: step,
+              path: path,
+              pose: parameter('hole_pose'),
+              reference: true,
+              isBottomRightFirst: false,
+              relatedPoses: {
+                socketPose: parameter('socket_pose'),
+                holePose: parameter('hole_pose'),
+                transit: parameter('home_pose'),
+              },
+              componentProviderAPI: componentProviderAPI
+            ">
+              <div id="hole-content" top="105px" left="40px" class="relative" style="width: 80px; height: 130px;">
+                <svg class="center-bottom network-box static-light-gray">
+                  <use xlink:href="bundles/base/icons/cube.svg#icon"></use>
+                </svg>
+                <svg class="center-top network-cable" style="height: 45px; top: 25px">
+                  <use xlink:href="bundles/ride_learning_tutorial/plug-inserted.svg#icon"></use>
+                </svg>
+              </div>
+            </robot-pose>
+          </step>
+        </div>
+      </step>
+      <step id="plug-in-params" name="Plug In Parameter" class="flex-column">
+        <step id="set-duration" name="Duration" class="flex-column" label="Maximum Duration of Insertion">
+          <h2 data-bind="text: step.label"></h2>
+          <arc-slider params="
+            value: parameter('duration'),
+            initial: 5,
+            fullValue: 20,
+            unit: 's',
+            step: step
+          "/>
+        </step>
+        <step id=set-tolerance name="Set Tolerance" label="Set Tolerance to target in Z Direction" class="flex-column">
+          <h2 data-bind="html: step.label"></h2>
+          <linear-slider params="
+            value: parameter('tolerance[2]'),
+            initial: 0.0005,
+            increment: 0.0001,
+            max: 0.001,
+            min: 0,
+            unit: 'm',
+            step: step
+          "/>
+        </step>
+      </step>
+      <step id="select-mode" name="Mode" class="flex-column">
+        <h2 data-bind="html: step.label"></h2>
+        <checkbox-slider params="
+          value: parameter('learning'),
+          checked: 'Learning',
+          unchecked: 'Execution',
+          step: step
+        "></checkbox-slider>
+      </step>
+      <step id="hyperparameter" name="Hyperparameters" class="flex-column" if="parameter('learning')() == true">
+        <step id="set-iterations" name="Iterations" label="Number of Iterations" class="flex-column" >
+          <h2 data-bind="html: step.label"></h2>
+          <linear-slider params="
+            value: parameter('hyperparameters.max_iteration'),
+            initial: 50,
+            increment: 1,
+            max: 100,
+            min: 1,
+            step: step
+          "/>
+        </step>
+        <step id="set-translational-amplitude" name="Translational Amplitude" label="Translational Amplitude Boundaries" class="flex-column">
+          <h2 data-bind="html: step.label"></h2>
+          <toggle-slider params="
+            parameters: [
+              {value: parameter('hyperparameters.lower_bounds[0]'), label: 'lower bound', min: 0, max: 10},
+              {value: parameter('hyperparameters.upper_bounds[0]'), label: 'upper bound', min: 0, max: 10},
+            ],
+            step: step
+          "/>
+        </step>
+        <step id="set-rotational-amplitude" name="Rotational Amplitude" label="Rotational Amplitude Boundaries" class="flex-column">
+          <h2 data-bind="html: step.label"></h2>
+          <toggle-slider params="
+            parameters: [
+              {value: parameter('hyperparameters.lower_bounds[1]'), label: 'lower bound', min: 0, max: 10},
+              {value: parameter('hyperparameters.upper_bounds[1]'), label: 'upper bound', min: 0, max: 10},
+            ],
+            step: step
+          "/>
+        </step>
+        <step id="set-impedance-factor" name="Impedance" label="Impedance Boundaries" class="flex-column">
+          <h2 data-bind="html: step.label"></h2>
+          <toggle-slider params="
+            parameters: [
+              {value: parameter('hyperparameters.lower_bounds[2]'), label: 'lower bound', min: 0, max: 20},
+              {value: parameter('hyperparameters.upper_bounds[2]'), label: 'upper bound', min: 0, max: 20},
+            ],
+            step: step
+          "/>
+        </step>
+        <step id="set-force" name="Insertion Force" label="Insertion Force Boundaries" class="flex-column">
+          <h2 data-bind="html: step.label"></h2>
+          <toggle-slider params="
+            parameters: [
+              {value: parameter('hyperparameters.lower_bounds[3]'), label: 'lower bound', min: 0, max: 60},
+              {value: parameter('hyperparameters.upper_bounds[3]'), label: 'upper bound', min: 0, max: 60},
+            ],
+            step: step
+          "/>
+        </step>
+      </step>
+    }@;
+  }
+
+  parameterType {
+    -- safety parameters, received from timeline
+    {
+      {
+        float x;
+        float y;
+        float z;
+        float x_rot;
+        float y_rot;
+        float z_rot;
+      } force_thresholds;
+      {
+        float j0;
+        float j1;
+        float j2;
+        float j3;
+        float j4;
+        float j5;
+        float j6;
+      } torque_thresholds;
+    } safety;
+    -- home pose, where to start and reset
+    {
+      [16]float pose;
+      []float joint_angles;
+    } home_pose;
+    -- pose of socket
+    {
+      [16]float pose;
+      []float joint_angles;
+    } socket_pose;
+    -- end effector pose when plug is inserted
+    {
+      [16]float pose;
+      []float joint_angles;
+    } hole_pose;
+    bool learning;
+    -- hyperparameters for the optimizer
+    {
+      int max_iteration;
+      int param_count;
+      []float lower_bounds;
+      []float upper_bounds;
+    } hyperparameters;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  entry@{
+    print(parameter.hyperparameters)
+  }@
+
+  -- convert timeline parameters
+  --> convert <- convert_safety {
+    port success -> learn_or_run
+  } where {
+    safety: parameter.safety;
+  }
+
+  -- check if plug_in should be learned or executed using learned parameters
+  learn_or_run {
+    port learn parameter.learning == true -> learning
+    port run parameter.learning == false -> get_best_params
+    parameterType{
+      bool learning;
+    }
+  } where{
+    learning: parameter.learning;
+  }
+
+  -- learn to plug_in
+  learning <- plug_in_learning_ride {
+  } where {
+    home_pose: parameter.home_pose;
+    socket_pose: parameter.socket_pose;
+    hole_pose: parameter.hole_pose;
+    hyperparameters: parameter.hyperparameters;
+    tolerance: parameter.tolerance;
+    duration: parameter.duration;
+    safety: child("convert").result.safety;
+  }
+
+  -- service call to get learned parameters
+  get_best_params{
+    port success service("learning").operation("getBestParams").status == "success" -> plug_in
+    port error service("learning").operation("getBestParams").status == "error"
+
+    resultType {
+      {
+        float amplitude_factor_translation;
+        float amplitude_factor_rotation;
+        float impedance_factor;
+        float F_z;
+      } plug_in_params;
+      string error_cause;
+    }
+
+    entry @{
+      service("learning").operation("getBestParams").call({})
+    }@
+
+    action service("learning").operation("getBestParams").status == "success" @{
+      local res = service("learning").operation("getBestParams").result
+      local plug_in_params =
+      {
+        amplitude_factor_translation = res.parameters[1],
+        amplitude_factor_rotation = res.parameters[2],
+        impedance_factor = res.parameters[3],
+        F_z = res.parameters[4]
+      }
+      setResult({plug_in_params = plug_in_params;})
+      print("Learned parameters which will be used for plug in: ")
+      print(res)
+    }@
+
+    action service("learning").operation("getBestParams").status == "error" @{
+      print(service("learning").operation("getBestParams").error)
+      setResult({error_cause = service("learning").operation("getBestParams").error;})
+    }@
+  }
+
+  -- run plug in with learned parameters
+  plug_in <- plug_in_wrapper {
+  } where {
+    socket_pose: {
+      pose: parameter.socket_pose.pose;
+      q3: parameter.socket_pose.joint_angles[3];
+    };
+    hole_pose: parameter.hole_pose.pose;
+    plug_in_params: child("get_best_params").result.plug_in_params;
+    duration: parameter.duration;
+    tolerance: parameter.tolerance;
+    safety: child("convert").result.safety;
+  }
+
+
+  action child("learning").port("error") @{
+    setResult(child("learning").result)
+  }@
+
+  action child("get_best_params").port("error") @{
+    setResult({error_cause = child("get_best_params").result.error_cause;})
+  }@
+
+
+  action child("plug_in").port("error") @{
+    setResult({error_cause = child("plug_in").result.error_cause;})
+  }@
+
+} where {
+  safety: nil;
+  home_pose: nil;
+  socket_pose: nil;
+  hole_pose: nil;
+  learning: false;
+  hyperparameters: {
+    max_iteration: nil;
+    param_count: 4;
+    lower_bounds: [0.0, 0.0, 1.0, 0.5];
+    upper_bounds: [3.0, 3.0, 10.0, 25.0];
+  };
+  duration: 5.0;
+  tolerance: [0.015, 0.015, 0.0007];
+}

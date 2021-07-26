@@ -1,0 +1,281 @@
+plug_in_wrapper {
+  port success child("plug_in").port("success")
+  port error child("plug_in").port("error")
+
+  clientData {
+    description: @{
+      This statemachine is a high-level wrapper for plug_in.
+      It calculates parameters required for plug_in using high-level parameters.
+      After the conversion the plug_in statemachine is executed.
+    }@;
+  }
+
+  parameterType {
+    -- Safety parameters
+    {
+      [7]float lower_torque_thresholds_nominal;
+      [7]float upper_torque_thresholds_nominal;
+      [7]float lower_torque_thresholds_acceleration;
+      [7]float upper_torque_thresholds_acceleration;
+      [6]float lower_force_thresholds_nominal;
+      [6]float upper_force_thresholds_nominal;
+      [6]float lower_force_thresholds_acceleration;
+      [6]float upper_force_thresholds_acceleration;
+    } safety;
+    -- socket pose consisting of pose and q3 (angle of joint 3)
+    {
+      [16]float pose;
+      float q3;
+    } socket_pose;
+    -- end effector pose when plug is inserted
+    [16]float  hole_pose;
+    {
+      -- parameter for wiggle motion
+      float amplitude_factor_translation;
+      float amplitude_factor_rotation;
+      -- stiffness of robot during insertion
+      float impedance_factor;
+      -- insertion force in z direction of robot's end-effector frame [N]
+      float F_z;
+    } plug_in_params;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  entry @{
+    print("Plug in parameters:")
+    print(parameter.plug_in_params)
+  }@
+
+  -- Now, the parameters required for plug in are calculated
+  --> calculate_parameters {
+    port done result~=nil -> plug_in
+
+    parameterType {
+      {
+        [7]float lower_torque_thresholds_nominal;
+        [7]float upper_torque_thresholds_nominal;
+        [7]float lower_torque_thresholds_acceleration;
+        [7]float upper_torque_thresholds_acceleration;
+        [6]float lower_force_thresholds_nominal;
+        [6]float upper_force_thresholds_nominal;
+        [6]float lower_force_thresholds_acceleration;
+        [6]float upper_force_thresholds_acceleration;
+      } safety;
+      {
+        [16]float pose;
+        float q3;
+      } socket_pose;
+      [16]float  hole_pose;
+      {
+        float amplitude_factor_translation;
+        float amplitude_factor_rotation;
+        float impedance_factor;
+        float F_z;
+      } plug_in_params;
+      float duration;
+      [3]float tolerance;
+    }
+
+    resultType {
+      -- motion for moving to socket pose
+      {
+        []{
+          {[16]float pose;} pose;
+          bool point2point;
+          float cartesian_velocity_factor;
+          float cartesian_acceleration_factor;
+          float cartesian_deceleration_factor;
+          float q3;
+        } poses;
+        {
+          [6]int K_x;
+        } cartesian_impedance;
+        {
+          [7]int K_theta;
+        } joint_impedance;
+        {
+          [7]float lower_torque_thresholds_nominal;
+          [7]float upper_torque_thresholds_nominal;
+          [7]float lower_torque_thresholds_acceleration;
+          [7]float upper_torque_thresholds_acceleration;
+          [6]float lower_force_thresholds_nominal;
+          [6]float upper_force_thresholds_nominal;
+          [6]float lower_force_thresholds_acceleration;
+          [6]float upper_force_thresholds_acceleration;
+        } safety;
+        int controller_mode;
+      } socket_motion;
+      -- wiggle motion for insertion
+      {
+        [6]{
+          int type;
+          float a_0;
+          [5]float a_n;
+          [5]float b_n;
+          float T_fourier;
+        } profiles;
+        float duration;
+        int frame_selection;
+        float safety_distance_x;
+        float safety_distance_y;
+        float safety_distance_z;
+        float safety_distance_theta;
+      } wiggle_motion;
+      -- force profile for insertion
+      {
+        [6]float F_d;
+        float duration;
+        float safety_distance_x;
+        float safety_distance_y;
+        float safety_distance_z;
+        float safety_distance_theta;
+        float force_tolerance;
+      } force;
+      -- move configuration during the actual insertion: high collision thresholds,
+      -- low stiffness (depends on high-level parameter impedance_factor)
+      {
+        -- cartesian impedance during insertion
+        {
+          [6]int K_x;
+        } cartesian_impedance;
+        -- joint impedance during insertion, affecting nullspace if a cartesian controller is used
+        {
+          [7]int K_theta;
+        } joint_impedance;
+        {
+          [7]float lower_torque_thresholds_nominal;
+          [7]float upper_torque_thresholds_nominal;
+          [7]float lower_torque_thresholds_acceleration;
+          [7]float upper_torque_thresholds_acceleration;
+          [6]float lower_force_thresholds_nominal;
+          [6]float upper_force_thresholds_nominal;
+          [6]float lower_force_thresholds_acceleration;
+          [6]float upper_force_thresholds_acceleration;
+        } safety;
+      } insertion_move_configuration;
+      -- pose of the hole and tolerance to check if plug is inserted
+      [16]float hole_pose;
+      [3]float tolerance;
+    }
+
+    entry @{
+      -- define movement to socket pose, accepted by move_via statemachine
+      local socket_motion = {
+        poses = {
+          {
+            pose = { pose = parameter.socket_pose.pose; },
+            point2point = true, -- Robot needs to reach this point exactly
+            cartesian_velocity_factor = 0.1,
+            cartesian_acceleration_factor = 0.1,
+            cartesian_deceleration_factor = 0.1,
+            -- q3 is the robot's third joint
+            q3 = parameter.socket_pose.q3,
+          }
+        },
+        controller_mode = 2,
+        -- high stiffness for high precision
+        cartesian_impedance = {
+            K_x = {2500, 2500, 1500, 150, 150, 150}
+        },
+        joint_impedance = {
+          K_theta = {4000, 4000, 4000, 3500, 3500, 3000, 3000}
+        },
+        -- standard collision thresholds (from idle_statemachine)
+        safety = parameter.safety;
+      }
+
+      -- define desired wiggle motion as fourier profile, accepted by move_velocity statemachine
+      local wiggle_motion = {
+        -- compute fourier coefficients
+        profiles = {
+          {type = 0, a_0 = 0., a_n = {0.01*parameter.plug_in_params.amplitude_factor_translation/4, 0., 0., 0., 0.},
+                               b_n = {0., 0., 0., 0., 0.}, T_fourier = 4.},
+          {type = 0, a_0 = 0., a_n = {0., 0., 0., 0.03*parameter.plug_in_params.amplitude_factor_translation/2, 0.},
+                               b_n = {0., 0., 0., 0., 0.}, T_fourier = 2.},
+          {type = 0, a_0 = 0., a_n = {0., 0., 0., 0., 0.},
+                               b_n = {0., 0., 0., 0., 0.}, T_fourier = 1},
+          {type = 0, a_0 = 0., a_n = {0.1*parameter.plug_in_params.amplitude_factor_rotation/4, 0., 0., 0. , 0.},
+                               b_n = {0., 0., 0., 0., 0.}, T_fourier = 4.},
+          {type = 0, a_0 = 0., a_n = {0., 0., 0.3*parameter.plug_in_params.amplitude_factor_rotation/2, 0., 0.},
+                               b_n = {0. , 0., 0., 0., 0.}, T_fourier = 2.},
+          {type = 0, a_0 = 0., a_n = {0., 0., 0.3*parameter.plug_in_params.amplitude_factor_rotation, 0., 0.},
+                               b_n = {0., 0., 0., 0., 0.}, T_fourier = 2.}
+        },
+        duration = parameter.duration,
+        frame_selection = 1,
+        safety_distance_x = 0.05,
+        safety_distance_y = 0.05,
+        safety_distance_z = 0.015,
+        safety_distance_theta = 0.3
+      }
+
+      -- define desired force
+      local force = {
+        F_d ={0., 0., parameter.plug_in_params.F_z, 0., 0., 0.}; -- desired force
+        force_tolerance = 0.1;
+        safety_distance_x = 0.05,
+        safety_distance_y = 0.05,
+        safety_distance_z = 0.015,
+        safety_distance_theta = 0.3,
+        duration = parameter.duration
+      }
+
+      -- compute desired cartesian and joint impedance for insertion
+      local K_x = {50*parameter.plug_in_params.impedance_factor, 50*parameter.plug_in_params.impedance_factor,
+                   50*parameter.plug_in_params.impedance_factor, 5*parameter.plug_in_params.impedance_factor,
+                   5*parameter.plug_in_params.impedance_factor, 5*parameter.plug_in_params.impedance_factor}
+      local K_theta = {50*parameter.plug_in_params.impedance_factor, 50*parameter.plug_in_params.impedance_factor,
+                       50*parameter.plug_in_params.impedance_factor, 30*parameter.plug_in_params.impedance_factor,
+                       30*parameter.plug_in_params.impedance_factor, 30*parameter.plug_in_params.impedance_factor,
+                       30*parameter.plug_in_params.impedance_factor}
+
+      -- define desired move configuration for insertion: high thresholds, lower stiffness
+      local insertion_move_configuration = {
+        cartesian_impedance = {K_x = K_x},
+        joint_impedance = {K_theta = K_theta},
+        safety = parameter.safety;
+      }
+
+      -- set result
+      local result = {}
+      result.socket_motion = socket_motion
+      result.wiggle_motion = wiggle_motion
+      result.force = force
+      result.insertion_move_configuration = insertion_move_configuration
+      result.hole_pose = parameter.hole_pose
+      result.tolerance = parameter.tolerance
+      setResult(result)
+    }@
+  } where parameter
+
+  -- Execute plug_in statemachine to insert plug into the hole
+  plug_in <- plug_in {
+  } where child("calculate_parameters").result
+
+  -- Check for triggered ports and set result accordingly.
+  action child("plug_in").port("error") @{
+    setResult(child("plug_in").result)
+  }@
+
+} where {
+  safety: nil;
+  socket_pose: nil;
+  hole_pose: nil;
+  plug_in_params:
+  {
+    amplitude_factor_translation: 1.0;
+    amplitude_factor_rotation: 1.0;
+    impedance_factor: 7.0;
+    F_z: 4.0;
+  };
+  duration: 5.0;
+  tolerance: [0.015, 0.015, 0.00025];
+}

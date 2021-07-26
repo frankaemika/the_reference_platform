@@ -1,0 +1,73 @@
+convert_safety {
+  port success result~=nil
+  port error result==nil
+
+  clientData {
+    description: @{
+      This statemachine converts the safety parameters (collision thresholds)
+      received from timeline to the format required by the state machines.
+    }@;
+  }
+
+  parameterType {
+    {
+      {
+        float x;
+        float y;
+        float z;
+        float x_rot;
+        float y_rot;
+        float z_rot;
+      } force_thresholds;
+      {
+        float j0;
+        float j1;
+        float j2;
+        float j3;
+        float j4;
+        float j5;
+        float j6;
+      } torque_thresholds;
+    } safety;
+  }
+
+  resultType {
+    {
+      [7]float lower_torque_thresholds_nominal;
+      [7]float upper_torque_thresholds_nominal;
+      [7]float lower_torque_thresholds_acceleration;
+      [7]float upper_torque_thresholds_acceleration;
+      [6]float lower_force_thresholds_nominal;
+      [6]float upper_force_thresholds_nominal;
+      [6]float lower_force_thresholds_acceleration;
+      [6]float upper_force_thresholds_acceleration;
+    } safety;
+  }
+
+  entry @{
+    local result = {}
+    local torque_thresholds = {
+      parameter.safety.torque_thresholds.j0, parameter.safety.torque_thresholds.j1,
+      parameter.safety.torque_thresholds.j2, parameter.safety.torque_thresholds.j3,
+      parameter.safety.torque_thresholds.j4, parameter.safety.torque_thresholds.j5,
+      parameter.safety.torque_thresholds.j6
+    }
+    local force_thresholds = {
+      parameter.safety.force_thresholds.x, parameter.safety.force_thresholds.y,
+      parameter.safety.force_thresholds.z, parameter.safety.force_thresholds.x_rot,
+      parameter.safety.force_thresholds.y_rot, parameter.safety.force_thresholds.z_rot
+    }
+    result.safety = {
+      lower_torque_thresholds_nominal = torque_thresholds;
+      upper_torque_thresholds_nominal = torque_thresholds;
+      lower_torque_thresholds_acceleration = torque_thresholds;
+      upper_torque_thresholds_acceleration = torque_thresholds;
+      lower_force_thresholds_nominal = force_thresholds;
+      upper_force_thresholds_nominal = force_thresholds;
+      lower_force_thresholds_acceleration = force_thresholds;
+      upper_force_thresholds_acceleration = force_thresholds;
+    }
+    setResult(result)
+  }@
+
+}
