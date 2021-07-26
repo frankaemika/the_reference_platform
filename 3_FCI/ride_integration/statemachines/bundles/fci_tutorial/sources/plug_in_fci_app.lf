@@ -1,0 +1,296 @@
+plug_in_fci_app {
+port Success child("plug_in").port("success")
+port Error child("plug_in").port("error")
+
+  clientData{
+    type : "app";
+    name : "Plug In FCI";
+    color : "hsl(230, 55%, 82%)";
+    description: @{
+      This app inserts a plug into a hole.
+    }@;
+    requiredParameters: [
+      { source: safety; localParameter: safety; }
+    ];
+    image: @{
+      <svg><use xlink:href="bundles/fci_tutorial/logo.svg#icon"></use></svg>
+    }@;
+    contextMenu: @{
+      <step id="plug-in-poses" name="Plug-in motion" style="display: grid">
+        <style>
+          .network-cable {
+            width: 80px;
+            height: 70px;
+          }
+          .network-box {
+            width: 80px;
+            height: 80px;
+          }
+        </style>
+        <div style="display: grid; grid-column-gap: 170px; grid-row-gap: 20px;">
+          <step id="socket" name="Contact with input"
+            label="Establish contact with the top part of the input"
+            style="grid-column: 1; grid-row: 1;">
+            <robot-pose params="
+              step: step,
+              path: path,
+              pose: parameter('socket_pose'),
+              relatedPoses: {
+                socketPose: parameter('socket_pose'),
+                holePose: parameter('hole_pose'),
+              },
+              componentProviderAPI: componentProviderAPI
+            ">
+              <div id="socket-content" top="60px" left="90px" class="relative" style="width: 80px; height: 130px;">
+                <svg class="center-bottom network-box static-light-gray visible"><use xlink:href="bundles/base/icons/cube.svg#icon"></use></svg>
+                <svg class="center-top network-cable">
+                  <use xlink:href="bundles/fci_tutorial/plug.svg#icon"></use>
+                </svg>
+              </div>
+            </robot-pose>
+          </step>
+          <step id="hole" name="Plug insert" label="Insert the plug so that it reaches its desired position"
+            style="grid-column: 1; grid-row: 2; justify-content: center; align-items: flex-start;">
+            <robot-pose params="
+              step: step,
+              path: path,
+              pose: parameter('hole_pose'),
+              reference: true,
+              isBottomRightFirst: false,
+              relatedPoses: {
+                socketPose: parameter('socket_pose'),
+                holePose: parameter('hole_pose'),
+              },
+              componentProviderAPI: componentProviderAPI
+            ">
+              <div id="hole-content" top="105px" left="40px" class="relative" style="width: 80px; height: 130px;">
+                <svg class="center-bottom network-box static-light-gray">
+                  <use xlink:href="bundles/base/icons/cube.svg#icon"></use>
+                </svg>
+                <svg class="center-top network-cable" style="height: 45px; top: 25px">
+                  <use xlink:href="bundles/fci_tutorial/plug-inserted.svg#icon"></use>
+                </svg>
+              </div>
+            </robot-pose>
+          </step>
+        </div>
+      </step>
+      <step id="duration" name="Duration" label="Duration" class="flex-column">
+          <step id="set-duration" name="Duration" class="flex-column" label="Duration">
+            <h2 data-bind="text: step.label"></h2>
+            <arc-slider params="
+              value: parameter('duration'),
+              initial: 5,
+              fullValue: 20,
+              unit: 's',
+              step: step
+            "/>
+          </step>
+          <step id=set-tolerance name="Set Tolerance" label="Set Tolerance to Target in Z Direction" class="flex-column">
+            <h2 data-bind="html: step.label"></h2>
+            <linear-slider params="
+              value: parameter('tolerance[2]'),
+              initial: 0.0005,
+              increment: 0.0001,
+              max: 0.001,
+              min: 0,
+              unit: 'm',
+              step: step
+            "/>
+          </step>
+      </step>
+      <step id="expert-param" name="Expert Parameter" label="Expert Parameter" class="flex-column"
+          if="true"><!-- Set to false for demonstration -->
+          <style>
+            #search-param step {
+              visibility: visible;
+            }
+          </style>
+          <step id="set-force" name="Force" class="flex-column" label="Insertion Force">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.desired_force'),
+              initial: 15,
+              increment: 0.1,
+              max: 50,
+              unit: 'N',
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-stiffness-translation" name="Translational Stiffness" class="flex-column" label="Translational Stiffness">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.translational_stiffness'),
+              initial: 1000.,
+              increment: 1,
+              max: 2000.,
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-stiffness-rotation" name="Rotational Stiffness" class="flex-column" label="Rotational Stiffness">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.rotational_stiffness'),
+              initial: 20.,
+              increment: 1,
+              max: 40.,
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-wiggle-frequency-x" name="Wiggle frequency X" class="flex-column" label="Wiggle frequency X">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.wiggle_frequency_x'),
+              initial: 0.3,
+              increment: 0.01,
+              max: 1,
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-wiggle-frequency-y" name="Wiggle frequency Y" class="flex-column" label="Wiggle frequency Y">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.wiggle_frequency_y'),
+              initial: 0.3,
+              increment: 0.01,
+              max: 1,
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-wiggle-amplitude-x" name="Wiggle amplitude X" class="flex-column" label="Wiggle amplitude X">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.wiggle_amplitude_x'),
+              initial: 0.3,
+              increment: 0.01,
+              max: 1,
+              step: step
+            "></linear-slider>
+          </step>
+          <step id="set-wiggle-amplitude-y" name="Wiggle amplitude Y" class="flex-column" label="Wiggle amplitude Y">
+            <h2 data-bind="text: step.label"></h2>
+            <linear-slider params="
+              value: parameter('plug_in_params.wiggle_amplitude_y'),
+              initial: 0.3,
+              increment: 0.01,
+              max: 1,
+              step: step
+            "></linear-slider>
+          </step>
+        </step>
+    }@;
+  }
+
+  parameterType {
+    -- safety parameters, received from timeline
+    {
+      {
+        float x;
+        float y;
+        float z;
+        float x_rot;
+        float y_rot;
+        float z_rot;
+      } force_thresholds;
+      {
+        float j0;
+        float j1;
+        float j2;
+        float j3;
+        float j4;
+        float j5;
+        float j6;
+      } torque_thresholds;
+    } safety;
+    -- pose of socket
+    {
+      [16]float pose;
+      []float joint_angles;
+    } socket_pose;
+    -- end effector pose when plug is inserted
+    {
+      [16]float pose;
+      []float joint_angles;
+    } hole_pose;
+    -- plug_in_params, see plug_in_controller.cpp/.h
+    {
+      float translational_stiffness;
+      float rotational_stiffness;
+      float desired_force;
+      float wiggle_frequency_x;
+      float wiggle_frequency_y;
+      float wiggle_amplitude_x;
+      float wiggle_amplitude_y;
+    } plug_in_params;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  -- convert timeline parameters
+  --> convert <- convert_safety {
+    port success -> plug_in
+  } where {
+    safety: parameter.safety;
+  }
+
+  -- plug_in plug
+  plug_in <- plug_in_fci {
+  } where {
+    socket_motion: {
+      poses: [
+        {
+          pose: { pose: parameter.socket_pose.pose; };
+          point2point: true; -- Robot needs to reach this point exactly
+          cartesian_velocity_factor: 0.1;
+          cartesian_acceleration_factor: 0.1;
+          cartesian_deceleration_factor: 0.1;
+          -- q3 is the robot's third joint
+          q3: parameter.socket_pose.joint_angles[3];
+        }
+      ];
+      controller_mode: 2; --cartesian controller
+      -- high stiffness for high precision
+      cartesian_impedance: {
+          K_x: [2500, 2500, 1500, 150, 150, 150];
+      };
+      joint_impedance: {
+        K_theta: [4000, 4000, 4000, 3500, 3500, 3000, 3000];
+      };
+      -- standard collision thresholds (from idle_statemachine)
+      safety: child("convert").result.safety;
+    };
+    hole_pose: parameter.hole_pose.pose;
+    insertion_safety: child("convert").result.safety;
+    plug_in_params: parameter.plug_in_params;
+    tolerance: parameter.tolerance;
+    duration: parameter.duration;
+  }
+
+  action child("plug_in").port("error") @{
+    setResult(child("plug_in").result)
+  }@
+
+} where {
+  safety: nil;
+  socket_pose: nil;
+  hole_pose: nil;
+  plug_in_params: {
+    translational_stiffness: 1000.0;
+    rotational_stiffness: 30.0;
+    desired_force: 10.0;
+    wiggle_frequency_x: 0.25;
+    wiggle_frequency_y: 0.50;
+    wiggle_amplitude_x: 0.15;
+    wiggle_amplitude_y: 0.3;
+  };
+  duration: 5.0;
+  tolerance: [0.015, 0.015, 0.0007];
+}
+

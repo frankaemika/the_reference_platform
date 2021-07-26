@@ -1,0 +1,332 @@
+plug_in_learning_ride {
+  port success child("set_result").port("learning_done")
+  port error child("init").port("error") or
+             child("reset").port("error") or
+             child("get_params").port("error") or
+             child("set_result").port("error")
+
+  clientData{
+    description: @{
+      This statemachine learns the parameters of the plug_in app.
+      The optimizer is implemented in the racecom service 'learning'
+      and includes operations like init, get_params and set_result.
+      The statemachine calls the corresponding operations
+      to init the optimizer, get next parameters to explore and
+      set the result of the exploration.
+    }@;
+  }
+
+  parameterType {
+    -- safety parameters
+    {
+      [7]float lower_torque_thresholds_nominal;
+      [7]float upper_torque_thresholds_nominal;
+      [7]float lower_torque_thresholds_acceleration;
+      [7]float upper_torque_thresholds_acceleration;
+      [6]float lower_force_thresholds_nominal;
+      [6]float upper_force_thresholds_nominal;
+      [6]float lower_force_thresholds_acceleration;
+      [6]float upper_force_thresholds_acceleration;
+    } safety;
+    -- socket pose for plug in
+    {
+      [16]float pose;
+      []float joint_angles;
+    } socket_pose;
+    -- end effector pose when plug is inserted
+    {
+      [16]float pose;
+      []float joint_angles;
+    } hole_pose;
+    -- start/reset pose
+    {
+      [16]float pose;
+      []float joint_angles;
+    } home_pose;
+    -- hyperparameters for optimizer
+    {
+      int max_iteration;
+      int param_count;
+      []float lower_bounds;
+      []float upper_bounds;
+    } hyperparameters;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  -- Initialize optimizer, e.g.set hyperparameter
+  --> init {
+    port success service("learning").operation("init").status == "success" -> reset
+    port error service("learning").operation("init").status == "error"
+
+    parameterType {
+      {
+        int max_iteration;
+        int param_count;
+        []float lower_bounds;
+        []float upper_bounds;
+      } hyperparameters;
+    }
+
+    entry @{
+      service("learning").operation("init").call(parameter.hyperparameters)
+    }@
+
+  } where {
+    hyperparameters: parameter.hyperparameters;
+  }
+
+  -- reset errors and move robot to start pose
+  reset {
+    port success child("home").port("success") -> get_params
+    port error child("reset_errors").port("error") or
+               child("home").port("error")
+
+    parameterType {
+      {
+        [16]float pose;
+        []float joint_angles;
+      } home_pose;
+      -- Safety parameters
+      {
+        [7]float lower_torque_thresholds_nominal;
+        [7]float upper_torque_thresholds_nominal;
+        [7]float lower_torque_thresholds_acceleration;
+        [7]float upper_torque_thresholds_acceleration;
+        [6]float lower_force_thresholds_nominal;
+        [6]float upper_force_thresholds_nominal;
+        [6]float lower_force_thresholds_acceleration;
+        [6]float upper_force_thresholds_acceleration;
+      } safety;
+    }
+
+    resultType {
+      string error_cause;
+    }
+
+    --> reset_errors <- reset_errors_library {
+      port success -> home
+    }
+
+    home <- move_via_with_move_configuration {
+    } where {
+      poses: [
+        {
+          pose: { pose: parameter.home_pose.pose; };
+          point2point: true; -- Robot needs to reach this point exactly
+          cartesian_velocity_factor: 0.1;
+          cartesian_acceleration_factor: 0.1;
+          cartesian_deceleration_factor: 0.1;
+          -- q3 is the robot's third joint
+          q3: parameter.home_pose.joint_angles[3];
+        }
+      ];
+      controller_mode: 2;
+      -- high stiffness for high precision
+      cartesian_impedance: {
+        K_x: [2000, 2000, 3000, 150, 150, 150];
+      };
+      joint_impedance: {
+        K_theta: [5000, 5000, 4500, 4000, 3000, 2500, 2000];
+      };
+      -- collision thresholds
+      safety: parameter.safety;
+    }
+
+    action child("reset_errors").port("error") @{
+      setResult({error_cause = child("reset_errors").result.error_cause;})
+    }@
+
+    action child("home").port("error") @{
+      setResult({error_cause = child("home").result.error_cause;})
+    }@
+
+  } where {
+    home_pose: parameter.home_pose;
+    safety: parameter.safety;
+  }
+
+  get_params {
+    port success service("learning").operation("getParams").status == "success" -> explore
+    port error service("learning").operation("getParams").status == "error"
+
+    resultType {
+      {
+      float amplitude_factor_translation;
+      float amplitude_factor_rotation;
+      float impedance_factor;
+      float F_z;
+      } plug_in_params;
+    }
+
+    entry @{
+      service("learning").operation("getParams").call({})
+    }@
+
+    exit @{
+      local res = service("learning").operation("getParams").result
+      local plug_in_params = {
+        amplitude_factor_translation = res.parameters[1],
+        amplitude_factor_rotation = res.parameters[2],
+        impedance_factor = res.parameters[3],
+        F_z = res.parameters[4]
+      }
+      setResult({plug_in_params = plug_in_params;})
+      print("Next Parameters: ")
+      print(result)
+    }@
+  }
+
+  -- explore suggested parameters by running plug_in statemachine
+  explore {
+    port done child("plug_in").port("success") or child("plug_in").port("error") -> set_result
+
+    parameterType {
+      -- Safety parameters
+      {
+        [7]float lower_torque_thresholds_nominal;
+        [7]float upper_torque_thresholds_nominal;
+        [7]float lower_torque_thresholds_acceleration;
+        [7]float upper_torque_thresholds_acceleration;
+        [6]float lower_force_thresholds_nominal;
+        [6]float upper_force_thresholds_nominal;
+        [6]float lower_force_thresholds_acceleration;
+        [6]float upper_force_thresholds_acceleration;
+      } safety;
+      {
+        [16]float pose;
+        float q3;
+      } socket_pose;
+      [16]float  hole_pose;
+      {
+        -- parameter for wiggle motion
+        float amplitude_factor_translation;
+        float amplitude_factor_rotation;
+        -- stiffness of robot during insertion
+        float impedance_factor;
+        -- insertion force in z direction of robot's end-effector frame
+        float F_z;
+      } plug_in_params;
+      -- maximum insertion time
+      float duration;
+      -- tolerance between the end effector pose
+      -- and hole pose to check if plug inserted
+      [3]float tolerance;
+    }
+
+    resultType {
+      float cost;
+      bool is_inserted;
+    }
+
+    -- Execute plug_in statemachine and observe the robot_state to compute the cost function
+    --> barrier plug_in_and_observe {
+      -> plug_in
+      -> observe
+    }
+
+    -- Run the plug_in statemachine
+    plug_in <- plug_in_wrapper {
+    } where parameter
+
+    -- observe the robot state and compute parts of the cost function
+    observe {
+
+      resultType {
+          float cost;
+      }
+
+      entry @{
+        setResult(nil)
+      }@
+
+      action service("robot").event("sensor_data") ~= nil @{
+          local F = service("robot").event("sensor_data").O_F_ext_hat_K
+          local F_norm = 0
+          -- compute norm
+          for i = 1,6,1 do
+            F_norm = F_norm + F[i]*F[i]
+          end
+          -- add to history
+          local res = {}
+          if result ~= nil then
+            res.cost = result.cost + F_norm
+          else
+            res.cost = F_norm
+          end
+          setResult(res)
+      }@
+    }
+
+    exit @{
+      -- set final cost function and flag if plug was successfully inserted
+      setResult({cost = child("observe").result.cost;
+                 is_inserted = child("plug_in").port("success");})
+    }@
+
+  } where {
+    socket_pose: {
+      pose: parameter.socket_pose.pose;
+      q3: parameter.socket_pose.joint_angles[3];
+    };
+    hole_pose: parameter.hole_pose.pose;
+    plug_in_params: child("get_params").result.plug_in_params;
+    duration: parameter.duration;
+    tolerance: parameter.tolerance;
+    safety: parameter.safety;
+  }
+
+  -- Return the cost and success indicator to optimizer
+  -- Depending on the service`s response the program decides if
+  -- the robot should to continue learning or not
+  set_result {
+    port learning_done service("learning").operation("setResult").status == "success" and
+                       service("learning").operation("setResult").result
+    port continue service("learning").operation("setResult").status == "success" and
+                  not service("learning").operation("setResult").result -> reset
+    port error service("learning").operation("setResult").status == "error"
+
+    parameterType {
+      float cost;
+      bool is_inserted;
+    }
+
+    entry @{
+      print("Result of exploration: ")
+      print(parameter)
+      service("learning").operation("setResult").call({cost = parameter.cost;
+                                                       success = parameter.is_inserted;})
+    }@
+  } where child("explore").result
+
+  action child("init").port("error") @{
+    setResult({error_cause = "Error in init state";})
+  }@
+
+  action child("reset").port("error") @{
+    setResult({error_cause = child("reset").result.error_cause;})
+  }@
+
+  action child("get_params").port("error") @{
+    setResult({error_cause = "Error in get_params state";})
+  }@
+
+  action child("set_result").port("error") @{
+    setResult({error_cause = "Error in set_result state";})
+  }@
+
+} where {
+  hyperparameters: {
+    max_iteration: 2;
+    param_count: 4;
+    lower_bounds: [0.0, 0.0, 1.0, 0.5];
+    upper_bounds: [3.0, 3.0, 10.0, 25.0];
+  };
+}

@@ -1,0 +1,8 @@
+{
+  int max_iteration;
+  int param_count;
+  []float lower_bounds;
+  []float upper_bounds;
+} request;
+{} result;
+string error;

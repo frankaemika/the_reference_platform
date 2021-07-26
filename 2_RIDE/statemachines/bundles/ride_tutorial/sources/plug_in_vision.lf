@@ -1,0 +1,167 @@
+plug_in_vision {
+  port success child("plug_in").port("success")
+  port error child("check_for_sockets").port("error") or
+             child("get_socket_pose").port("error") or
+             child("plug_in").port("error")
+
+  clientData {
+    description: @{
+      This statemachine implements the vision-based plug-in statemachine as described in the tutorial paper.
+      It basically shows how to connect a service with a statemachine. Therefore it first subscribes to the
+      `socket-pose.socket_info` event and checks the number of detected sockets. If the number of sockets
+      are larger than 0, this statemachine calls the `socket-pose.getSocketPose` operation to get the pose
+      of the socket and continue with the already implemented plug_in statemachine.
+    }@;
+  }
+
+  parameterType {
+    {
+      [7]float lower_torque_thresholds_nominal;
+      [7]float upper_torque_thresholds_nominal;
+      [7]float lower_torque_thresholds_acceleration;
+      [7]float upper_torque_thresholds_acceleration;
+      [6]float lower_force_thresholds_nominal;
+      [6]float upper_force_thresholds_nominal;
+      [6]float lower_force_thresholds_acceleration;
+      [6]float upper_force_thresholds_acceleration;
+    } safety;
+    {
+      -- parameter for wiggle motion
+      float amplitude_factor_translation;
+      float amplitude_factor_rotation;
+      -- stiffness of robot during insertion
+      float impedance_factor;
+      -- insertion force in z direction of robot's end-effector frame [N]
+      float F_z;
+    } plug_in_params;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  -- Check number of detected sockets. The amount of detected sockets `number_of_sockets`
+  -- will be published by the event `sockets-info` of the `socket-pose` service.
+  -- If `number_of_sockets` is larger than 0 continue to the next step,
+  -- otherwise fail the plug_in_vision.
+  --> check_for_sockets {
+    port success service("socket-pose").event("socket_info")~=nil and
+                 service("socket-pose").event("socket_info").number_of_sockets > 0 -> get_socket_pose
+    port error service("socket-pose").event("socket_info")~=nil and
+               service("socket-pose").event("socket_info").number_of_sockets == 0
+  }
+
+  -- Get the socket pose.
+  -- It is received from the `getSocketPose` operation of the `socket-pose` operation.
+  get_socket_pose {
+    port success service("socket-pose").operation("getSocketPose")
+                  .status == "success" -> get_q3
+    port error service("socket-pose").operation("getSocketPose").status == "error"
+
+    resultType
+    {
+      [16]float socket_pose;
+    }
+
+    entry @{
+      service("socket-pose").operation("getSocketPose").call({})
+    }@
+
+    exit @{
+      setResult(service("socket-pose").operation("getSocketPose").result)
+    }@
+  }
+
+  -- For the socket motion in the plug_in statemachine, a desired angle of joint 3 (q3)
+  -- for the nullspace is required. This q3 will be set to the current q3.
+  get_q3 {
+    port done result~=nil -> compute_hole_pose
+
+    resultType float
+
+    action service("robot").event("sensor_data")~=nil @{
+      setResult(service("robot").event("sensor_data").q[3])
+    }@
+  }
+
+  -- Compute the hole_pose.
+  -- The hole pose is required to check if plug is inserted.
+  compute_hole_pose {
+    port success result~=nil -> plug_in
+
+    parameterType {
+      [16]float socket_pose;
+    }
+
+    resultType {
+      [16]float hole_pose;
+    }
+
+    entry @{
+      -- It is assumed that the `hole_pose` is equal to the `socket_pose`
+      -- minus the plug length in z direction of the base frame.
+      -- NOTE: If you change the plug, update the plug_length accordingly.
+      local plug_length = 0.01 -- [m] valid for HDMI plug
+      local hole_pose = parameter.socket_pose
+      hole_pose[15] = hole_pose[15] - plug_length
+      setResult{hole_pose = hole_pose}
+    }@
+  } where child("get_socket_pose").result
+
+  -- Plug in the plug
+  plug_in <- plug_in_wrapper {
+  } where {
+    socket_pose: {
+      pose: child("get_socket_pose").result.socket_pose;
+      q3: child("get_q3").result;
+    };
+    hole_pose: child("compute_hole_pose").result.hole_pose;
+    plug_in_params: parameter.plug_in_params;
+    duration: parameter.duration;
+    tolerance: parameter.tolerance;
+    safety: parameter.safety;
+  }
+
+  -- check for triggered ports and set result accordingly
+
+  action child("check_for_sockets").port("error") @{
+    setResult({error_cause = "Could not detect any socket."})
+  }@
+
+  action child("get_socket_pose").port("error") @{
+    setResult({error_cause = "Get_socket_pose: Operation call failed."})
+  }@
+
+  action child("plug_in").port("error") @{
+    setResult(child("plug_in").result)
+  }@
+
+  action child("plug_in").port("success") @{
+    print("Plug-in-vision ended successfully!")
+  }@
+
+} where {
+  safety: {
+    lower_torque_thresholds_nominal: [60., 60., 60., 60., 50., 40., 30.];
+    upper_torque_thresholds_nominal: [60., 60., 60., 60., 50., 40., 30.];
+    lower_torque_thresholds_acceleration: [60., 60., 60., 60., 50., 40., 30.];
+    upper_torque_thresholds_acceleration: [60., 60., 60., 60., 50., 40., 30.];
+    lower_force_thresholds_nominal: [60., 60., 60., 30., 30., 30.];
+    upper_force_thresholds_nominal: [60., 60., 60., 30., 30., 30.];
+    lower_force_thresholds_acceleration: [60., 60., 60., 30., 30., 30.];
+    upper_force_thresholds_acceleration: [60., 60., 60., 30., 30., 30.];
+  };
+  plug_in_params: {
+    amplitude_factor_translation: 1.0;
+    amplitude_factor_rotation: 1.0;
+    impedance_factor: 4.0;
+    F_z: 10.0;
+  };
+  duration: 15.0;
+  tolerance: [0.015, 0.015, 0.001];
+}

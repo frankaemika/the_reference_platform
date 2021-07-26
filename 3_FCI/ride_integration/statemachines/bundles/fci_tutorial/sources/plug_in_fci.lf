@@ -1,0 +1,146 @@
+plug_in_fci {
+  port success child("plug_in_controller").port("success")
+  port error child("move_to_socket_pose").port("error") or
+             child("set_safety").port("error") or
+             child("plug_in_controller").port("error")
+
+  clientData{
+    description: @{
+      This statemachine inserts a plug into a hole. Therefore it first moves to a socket pose.
+      Then it runs the plug in controller implemented using fci. It is assumed that the plug is
+      inserted when the robot pose reaches the hole pose within a tolerance.
+    }@;
+  }
+
+  parameterType {
+    -- parameter for socket motion
+    {
+      []{
+        {[16]float pose;} pose;
+        bool point2point;
+        float cartesian_velocity_factor;
+        float cartesian_acceleration_factor;
+        float cartesian_deceleration_factor;
+        float q3;
+      } poses;
+      {
+        [6]int K_x;
+      } cartesian_impedance;
+      {
+        [7]int K_theta;
+      } joint_impedance;
+      {
+        [7]float lower_torque_thresholds_nominal;
+        [7]float upper_torque_thresholds_nominal;
+        [7]float lower_torque_thresholds_acceleration;
+        [7]float upper_torque_thresholds_acceleration;
+        [6]float lower_force_thresholds_nominal;
+        [6]float upper_force_thresholds_nominal;
+        [6]float lower_force_thresholds_acceleration;
+        [6]float upper_force_thresholds_acceleration;
+      } safety;
+      int controller_mode;
+    } socket_motion;
+    -- safety parameter for plug_in
+    {
+      [7]float lower_torque_thresholds_nominal;
+      [7]float upper_torque_thresholds_nominal;
+      [7]float lower_torque_thresholds_acceleration;
+      [7]float upper_torque_thresholds_acceleration;
+      [6]float lower_force_thresholds_nominal;
+      [6]float upper_force_thresholds_nominal;
+      [6]float lower_force_thresholds_acceleration;
+      [6]float upper_force_thresholds_acceleration;
+    } insertion_safety;
+    -- end effector pose when plug is inserted
+    [16]float hole_pose;
+    -- plug in parameter
+    {
+      float translational_stiffness;
+      float rotational_stiffness;
+      float desired_force;
+      float wiggle_frequency_x;
+      float wiggle_frequency_y;
+      float wiggle_amplitude_x;
+      float wiggle_amplitude_y;
+    } plug_in_params;
+    -- tolerance between the end effector pose
+    -- and hole pose to check if plug is successfully inserted [m]
+    [3]float tolerance;
+    -- maximum insertion time [s]
+    float duration;
+  }
+
+  resultType {
+    string error_cause;
+  }
+
+  --> move_to_socket_pose <- move_via_with_move_configuration {
+    port success -> set_safety
+  } where parameter.socket_motion
+
+  -- set collisions thresholds
+  set_safety <- set_safety {
+    port success -> plug_in_controller
+  } where parameter.insertion_safety
+
+  -- Run the plug_in fci controller. If service returns success, we assume plug has been inserted.
+  -- Otherwise we assume failure
+  plug_in_controller {
+    port success service("fci").operation("plugIn").status == "success"
+    port error service("fci").operation("plugIn").status == "error"
+
+    parameterType {
+      {
+        float translational_stiffness;
+        float rotational_stiffness;
+        float desired_force;
+        float wiggle_frequency_x;
+        float wiggle_frequency_y;
+        float wiggle_amplitude_x;
+        float wiggle_amplitude_y;
+      } plug_in_params;
+      float duration;
+      [3]float tolerance;
+      [3]float target_position;
+    }
+
+    resultType {
+      string error_cause;
+    }
+
+    entry @{
+      service("fci").operation("plugIn").call({
+        plug_in_params = parameter.plug_in_params;
+        duration = parameter.duration;
+        tolerance = parameter.tolerance;
+        target_position = parameter.target_position;
+      })
+    }@
+
+    action service("fci").operation("plugIn").status == "error" @{
+      setResult({error_cause = service("fci").operation("plugIn").error})
+    }@
+
+  } where {
+    plug_in_params: parameter.plug_in_params;
+    duration: parameter.duration;
+    tolerance: parameter.tolerance;
+    target_position: [parameter.hole_pose[13], parameter.hole_pose[14], parameter.hole_pose[15]];
+  }
+
+  -- Check for triggered ports and set result accordingly.
+
+  action child("move_to_socket_pose").port("error") @{
+    setResult({error_cause = child("move_to_socket_pose").result.error_cause})
+  }@
+
+  action child("set_safety").port("error") @{
+    setResult({error_cause = child("set_safety").result.error_cause})
+  }@
+
+  action child("plug_in_controller").port("error") @{
+    setResult({error_cause = child("plug_in_controller").result.error_cause})
+  }@
+
+}
