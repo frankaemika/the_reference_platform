@@ -229,14 +229,13 @@ plug_in_wrapper {
       }
 
       -- compute desired cartesian and joint impedance for insertion
-      local K_x = {50*parameter.plug_in_params.impedance_factor, 50*parameter.plug_in_params.impedance_factor,
-                   50*parameter.plug_in_params.impedance_factor, 5*parameter.plug_in_params.impedance_factor,
-                   5*parameter.plug_in_params.impedance_factor, 5*parameter.plug_in_params.impedance_factor}
-      local K_theta = {50*parameter.plug_in_params.impedance_factor, 50*parameter.plug_in_params.impedance_factor,
-                       50*parameter.plug_in_params.impedance_factor, 30*parameter.plug_in_params.impedance_factor,
-                       30*parameter.plug_in_params.impedance_factor, 30*parameter.plug_in_params.impedance_factor,
-                       30*parameter.plug_in_params.impedance_factor}
-
+      local K_x = {math.floor(50*parameter.plug_in_params.impedance_factor), math.floor(50*parameter.plug_in_params.impedance_factor),
+                   math.floor(50*parameter.plug_in_params.impedance_factor), math.floor(5*parameter.plug_in_params.impedance_factor),
+                   math.floor(5*parameter.plug_in_params.impedance_factor), math.floor(5*parameter.plug_in_params.impedance_factor)}
+      local K_theta = {math.floor(50*parameter.plug_in_params.impedance_factor), math.floor(50*parameter.plug_in_params.impedance_factor),
+                       math.floor(50*parameter.plug_in_params.impedance_factor), math.floor(30*parameter.plug_in_params.impedance_factor),
+                       math.floor(30*parameter.plug_in_params.impedance_factor), math.floor(30*parameter.plug_in_params.impedance_factor),
+                       math.floor(30*parameter.plug_in_params.impedance_factor)}
       -- define desired move configuration for insertion: high thresholds, lower stiffness
       local insertion_move_configuration = {
         cartesian_impedance = {K_x = K_x},
