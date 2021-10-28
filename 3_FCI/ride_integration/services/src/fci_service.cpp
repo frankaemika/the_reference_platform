@@ -17,8 +17,8 @@ void plugInCb(CallHandle h, struct PlugIn_request* req, void* hint) {
 
   // required convertion
   std::array<double, 3> target_position, tolerance;
-  std::copy(req->target_position, req->target_position + 2, target_position.begin());
-  std::copy(req->tolerance, req->tolerance + 2, tolerance.begin());
+  std::copy(req->target_position, req->target_position + 3, target_position.begin());
+  std::copy(req->tolerance, req->tolerance + 3, tolerance.begin());
 
   plug_in_controller::Parameters plug_in_params = {
       req->plug_in_params.translational_stiffness, req->plug_in_params.rotational_stiffness,
