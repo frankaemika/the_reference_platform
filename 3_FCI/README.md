@@ -21,7 +21,7 @@ mkdir build && cd build
 Run cmake with the following flags in order to build the *FCI* tutorial
 
 ```sh
-cmake -DBUILD_RIDE=OFF -DBUILD_FCI=ON -DBUILD_LEARNING=OFF -DCMAKE_BUILD_TYPE=Release -DFranka_Dir=<path/to/libfranka/build/folder> ..
+cmake -DBUILD_RIDE=OFF -DBUILD_FCI=ON -DBUILD_LEARNING=OFF -DCMAKE_BUILD_TYPE=Release -DFranka_DIR=<path/to/libfranka/build/folder> ..
 ```
 
 and finally compile the *FCI* tutorial with
