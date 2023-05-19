@@ -8,7 +8,7 @@ Make sure you are connected to the robot, either to the *Arm* base or to *Contro
 * The already configured shopfloor IP if you are connected to *Control*. If you don't know your shopfloor IP you can always connect your PC to the *Arm* base first and configure it in the Admin menu of *Desk*.
 
 ## Programming with Desk
-This tutorial implements the plug in task using *Desk* as described in Section III-A in the Tutorial Paper. </br>
+This tutorial implements the plug in task using *Desk* as described in Section III-A in the [Tutorial Paper](#tutorial-paper). </br>
 The plug in task is programmed using the following three basic Apps included in the Research Apps bundle:
 
 * The *Cartesian Motion App* will position the robot in its initial pose.

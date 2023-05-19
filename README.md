@@ -76,6 +76,10 @@ The following table lists some helpful commands that might be used during the tu
 * RaceCom version 14.X
 * libfranka version 0.8.X
 
+## Tutorial paper
+
+**The Franka Emika Robot: A Reference Platform for Robotics Research and Education** paper is located [here](https://ieeexplore.ieee.org/document/9721535).
+
 ## License
 
 `the_reference_platform` is licensed under the [Apache 2.0 license][apache-2.0].
