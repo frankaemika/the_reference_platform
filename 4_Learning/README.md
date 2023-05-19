@@ -1,5 +1,5 @@
 # Learning
-This tutorial shows how to apply *on robot* learning with the Franka Emika AIR Platform as described in the [Tutorial Paper](#tutorial-paper) in Section IV.
+This tutorial shows how to apply *on robot* learning with the Franka Emika AIR Platform as described in the [Tutorial Paper](../README.md#tutorial-paper) in Section IV.
 
 For both the `plug_in` ([RIDE tutorial](../2_RIDE)) and `plug_in_fci` ([FCI tutorial](../3_FCI)) examples, we implement a procedure that explores and optimizes the control parameters that succeed and at the same time minimize the interaction forces.
 
