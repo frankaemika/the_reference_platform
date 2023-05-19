@@ -55,19 +55,17 @@ This tutorial showcases the wide range of programming possibilities that the Fra
 ## RIDE CLI
 The following table lists some helpful commands that might be used during the tutorial.
 
-| Command                           | Description                                 |
-|-----------------------------------|---------------------------------------------|
-| `ride login <robot_ip>`           | Connect to the core.                        |
-| `ride bundle list`                | List installed bundles.                     |
-| `ride node list`                  | List root nodes (installed state machines). |
-| `ride cli services`               | List connected services.                    |
-| `ride cli start <state machine>`  | Start execution of a state machine.         |
-| `ride cli stop`                   | Stop execution gracefully.                  |
-| `ride cli kill`                   | Kill execution.                             |
-| `ride cli log`                    | Display the log message feed from the core. |
-| `ride cli echo <service> <event>` | Print service events relayed by the core.   |
-| `ride execution trace`            | Trace execution of a state machine.         |
-
+| Command                                | Description                                 |
+|----------------------------------------|---------------------------------------------|
+| `ride login <robot_ip>`                | Connect to the core.                        |
+| `ride bundle list`                     | List installed bundles.                     |
+| `ride node list`                       | List root nodes (installed state machines). |
+| `ride service list`                    | List connected services.                    |
+| `ride execution start <state machine>` | Start execution of a state machine.         |
+| `ride execution stop`                  | Stop execution gracefully.                  |
+| `ride log`                             | Display the log message feed from the core. |
+| `ride service echo <service> <event>`  | Print service events relayed by the core.   |
+| `ride execution trace`                 | Trace execution of a state machine.         |
 
 ## Requirements
 

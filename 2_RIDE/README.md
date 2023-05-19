@@ -88,7 +88,7 @@ ride execution trace
 and check the logs with
 
 ```sh
-ride cli log
+ride log
 ```
 
 ## Plug in App with vision
@@ -116,7 +116,7 @@ Note that this example focuses on how to connect an external service with a stat
 Before running the demo you probably want to adapt the hardcoded pose of the `socket-pose` service to your setup. To do so modify the hardcoded `socket_pose` in `services/src/socket_service.cpp` (l. 22) and compile the service again as described in the installation instructions. To adapt the socket pose to your setup, guide the robot to the desired pose and run the following command in a terminal
 
 ```sh
-ride cli echo robot sensor_data
+ride service echo robot sensor_data
 ```
 
 which echoes all robot sensor data. Copy the output of the `O_T_EE` (end effector pose) and paste it in the `services/src/socket_service.cpp` file (l. 22). After recompiling as described in the installation instructions the service should be providing the new hardcoded pose.
@@ -138,19 +138,19 @@ To run the App do the following:
     After running the service, it should appear listed when you enter the following command
 
     ```sh
-    ride cli services
+    ride service list
     ```
 
 2. Run the `plug_in_vision` state machine:</br>
     To run the `plug_in_vision` state machine first activate the external activation device, stop any execution currently running (e.g. idle state machine) by
 
     ```sh
-    ride cli stop
+    ride execution stop
     ```
     and then
 
     ```sh
-    ride cli start plug_in_vision
+    ride execution start plug_in_vision
     ```
 
     **This will make the robot move!**
