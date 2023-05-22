@@ -39,7 +39,7 @@ make fci_tutorial_statemachines
 After installing the bundle the `Plug In FCI` App should appear in the app pane. Note that the App is grey shaded as long as the `fci_service` is not running.
 
 ## Standalone
-To program a plug in task with the *FCI* we implement a Cartesian impedance controller with an additional term that regulates the desired contact force. For details on the mathematical background, please check the tutorial paper. The controller is implemented in `plug_in_controller.cpp/.h` as a reusable function which is used in `plug_in_controller_standalone.cpp` to run the controller. The controller finishes when the `hole_pose` is reached within an certain tolerance and time. Otherwise it throws an `franka_exception` which stop the robot control. For more information on the controller have look at the paper in Section III-C.
+To program a plug in task with the *FCI* we implement a Cartesian impedance controller with an additional term that regulates the desired contact force. For details on the mathematical background, please check the [Tutorial Paper](../README.md#tutorial-paper). The controller is implemented in `plug_in_controller.cpp/.h` as a reusable function which is used in `plug_in_controller_standalone.cpp` to run the controller. The controller finishes when the `hole_pose` is reached within an certain tolerance and time. Otherwise it throws an `franka_exception` which stop the robot control. For more information on the controller have look at the paper in Section III-C.
 
 #### Running the custom plug in controller
 

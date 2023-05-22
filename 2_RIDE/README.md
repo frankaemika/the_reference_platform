@@ -1,5 +1,5 @@
 # *RIDE*
-This tutorial illustrates how to program with *RIDE*, as described in the tutorial paper in Section III-B. It consists of the implementation of the `plug_in` and `plug_in_vision` state machines, their corresponding Apps and services.
+This tutorial illustrates how to program with *RIDE*, as described in the [Tutorial Paper](../README.md#tutorial-paper) in Section III-B. It consists of the implementation of the `plug_in` and `plug_in_vision` state machines, their corresponding Apps and services.
 
 ## Installation
 Make sure that *RIDE* and *RaceCom* is installed in your computer, you are connected to the *Arm* base or to *Control* and logged into the *Core*:
